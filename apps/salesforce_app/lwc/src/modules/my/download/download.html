@@ -1,0 +1,23 @@
+<template>
+    <div class="app-container">
+        <header class="slds-page-header">
+            <h2 class="slds-text-heading_medium">帳票ダウンロードマスタ</h2>
+            <div class="button-group">
+                <button class="btn-secondary" onclick={handleBack}>戻る</button>
+                <button class="btn-secondary" onclick={handleRefresh}>更新</button>
+            </div>
+        </header>
+
+        <div class="card">
+            <div id="grid" lwc:dom="manual"></div>
+        </div>
+
+        <div class="footer-actions">
+            <button class="btn-primary" onclick={handleDownloadSelected} disabled={isDownloadDisabled}>
+                ダウンロード
+            </button>
+        </div>
+
+        <my-download-popup visible={showPopup} items={selectedFiles} onclose={handlePopupClose}></my-download-popup>
+    </div>
+</template>

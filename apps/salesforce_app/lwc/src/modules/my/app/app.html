@@ -1,0 +1,36 @@
+<template>
+    <div class="layout">
+
+        <!-- 🔵 Salesforce風グローバルヘッダー -->
+        <header class="global-header">
+            <div class="logo">Salesforce Mock</div>
+            <div class="header-actions">
+                <button class="header-btn" onclick={goAbout}>About</button>
+                <button class="header-btn" onclick={goDownload}>Download</button>
+            </div>
+        </header>
+
+        <div class="body">
+
+            <!-- 📚 左サイドバー（Lightning風） -->
+            <nav class="sidebar">
+                <ul>
+                    <li class={downloadClass} onclick={goDownload}>帳票ダウンロード</li>
+                    <li class={aboutClass} onclick={goAbout}>About</li>
+                </ul>
+            </nav>
+
+            <!-- 🧩 メインコンテンツ（SPA切り替え） -->
+            <main class="content">
+                <template if:true={isDownload}>
+                    <my-download></my-download>
+                </template>
+
+                <template if:true={isAbout}>
+                    <my-about></my-about>
+                </template>
+            </main>
+
+        </div>
+    </div>
+</template>

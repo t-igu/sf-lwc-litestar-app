@@ -1,0 +1,23 @@
+<template>
+    <template if:true={visible}>
+        <div class="modal-wrapper">
+            <div class="backdrop"></div>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>ダウンロード状況</h2>
+                </div>
+                <div class="modal-body">
+                    <template for:each={items} for:item="item">
+                        <div key={item.id} class="progress-row">
+                            <span class="name">{item.name}</span>
+                            <span class="status-badge">{item.status}</span>
+                        </div>
+                    </template>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-outline" onclick={close}>閉じる</button>
+                </div>
+            </div>
+        </div>
+    </template>
+</template>

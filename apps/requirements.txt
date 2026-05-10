@@ -1,0 +1,7 @@
+litestar
+httpx
+cryptography
+pyjwt
+msgspec
+structlog
+python-dotenv
