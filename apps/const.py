@@ -51,6 +51,8 @@ SF_CLIENT_ID = "mock-client-id"
 SF_USERNAME = "mock-user@example.com"
 SF_AUDIENCE = "http://127.0.0.1:8000"
 
+TOKEN_CACHE_FILE = BASE_DIR / "data" / "storage" / "secret_key" / "sf_token.json"
+
 SF_PRIVATE_KEY_PATH = BASE_DIR / "data" / "storage" / "secret_key" / "sf_private_key.pem"
 with open(SF_PRIVATE_KEY_PATH, "r") as f:
     SF_PRIVATE_KEY = f.read()
@@ -58,6 +60,8 @@ with open(SF_PRIVATE_KEY_PATH, "r") as f:
 SF_PUBLIC_KEY_PATH = BASE_DIR / "data" / "storage" / "secret_key" / "sf_public_key.pem"
 with open(SF_PUBLIC_KEY_PATH, "r") as f:
     SF_PUBLIC_KEY = f.read()
+
+
 
 # ============================================================
 # SalesForce Objects directory

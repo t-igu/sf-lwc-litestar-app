@@ -1,13 +1,15 @@
 # Local Async File Download Demo
 
-Salesforce 互換 API を用いた **非同期ファイルダウンロード処理** を  
-ローカル環境で完全再現するデモプロジェクトです。
+Salesforce 互換 API を用いた **非同期ファイルダウンロード処理** をローカル環境で完全再現するデモプロジェクトです。
 
-- Salesforce® は一切不要（完全ローカルのモック環境）
 - LWC → Apex → Storage → Worker → Mock Salesforce → CDC の一連の流れを再現
-- Chunk Upload / 非同期処理 / 状態管理 / ログ基盤を統合
 
-詳細な技術ドキュメントは `/docs` に分割されています。
+シーケンス図
+
+[flow](docs\flow_0.md)
+
+
+![](docs\images\flow_1.drawio.svg)
 
 ---
 
@@ -48,13 +50,19 @@ python setup.py
 python setup_send_data.py
 ```
 
-### 3. Open UI
+## Open UI
 
 ```
 http://localhost:8000/index.html
 ```
 
 ---
+
+## details
+
+[module list](docs/module_list.md)
+
+[directory](docs/directories.md)
 
 
 ## ⚠️ Note
