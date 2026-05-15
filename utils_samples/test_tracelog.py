@@ -21,18 +21,18 @@ def main():
     # 2. 各ログレベルのメソッドテスト
     print("Testing basic logging methods...")
     logger.start("req-101")
-    logger.info("req-101", {"message": "Informational log"}, event_message="Custom Info Event")
-    logger.trace("req-102", {"detail": "Low-level trace data"}, event_message="Custom Trace Event")
-    logger.debug("req-103", TestData(user_id=1, action="login", metadata={"browser": "chrome"}), event_message="User Login")
-    logger.warning("req-104", {"issue": "Slow response detected"}, event_message="Performance Warning")
-    logger.error("req-105", {"critical_data": "corrupted"}, event_message="Data Corruption Error")
+    logger.info({"message": "Informational log"}, event_message="Custom Info Event")
+    logger.trace({"detail": "Low-level trace data"}, event_message="Custom Trace Event")
+    logger.debug(TestData(user_id=1, action="login", metadata={"browser": "chrome"}), event_message="User Login")
+    logger.warning({"issue": "Slow response detected"}, event_message="Performance Warning")
+    logger.error({"critical_data": "corrupted"}, event_message="Data Corruption Error")
 
     # 3. start / end メソッドによる計測テスト
     print("Testing start/end measurement...")
     request_id = "req-201"
     logger.start(request_id, {"task": "database_query"}, event_message="DB Query Start")
     time.sleep(0.15)  # 擬似的な処理待ち
-    logger.end(request_id, {"rows_found": 42}, event_message="DB Query End")
+    logger.end({"rows_found": 42}, event_message="DB Query End")
 
     # 3.1 start / end メソッドのデフォルトイベントメッセージのテスト
     request_id_default = "req-202"
@@ -45,7 +45,7 @@ def main():
     try:
         1 / 0
     except ZeroDivisionError:
-        logger.error("req-301", {"error": "division by zero"}, exc_info=True, event_message="Zero Division Attempt")
+        logger.error({"error": "division by zero"}, exc_info=sys.exc_info()[1], event_message="Zero Division Attempt")
 
     # 5. 標準 logging モジュールの統合テスト (FastAPI/httpx 等のログを取り込む想定)
     print("Testing standard logging integration...")

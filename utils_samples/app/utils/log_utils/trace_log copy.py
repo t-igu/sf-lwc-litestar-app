@@ -1,4 +1,3 @@
-import contextvars
 import importlib
 import logging
 import multiprocessing as mp
@@ -12,9 +11,6 @@ from typing import Any, Optional, Union
 import msgspec
 import structlog
 from structlog.types import Processor, EventDict
-
-# request_id を保持するための ContextVar
-request_id_ctx: contextvars.ContextVar[str] = contextvars.ContextVar("request_id", default="")
 
 # 独自のTRACEレベルを定義 (DEBUG: 10 より下の 5)
 TRACE_LEVEL_NUM = 5
@@ -34,7 +30,7 @@ logging.addLevelName(TRACE_LEVEL_NUM, "TRACE")
 class TraceLogWriter:
     """別プロセスで実行される書き込み専用クラス"""
     @staticmethod
-    def run(log_queue_obj: mp.Queue, file_path: str, buffer_limit: int = 64 * 1024):
+    def run(queue: mp.Queue, file_path: str, buffer_limit: int = 64 * 1024):
         # 高速化のため os.open を使用し、バイナリモードで追記
         fd = os.open(file_path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
         with os.fdopen(fd, "ab", buffering=0) as f:
@@ -42,7 +38,7 @@ class TraceLogWriter:
             buffer_bytes = 0
             while True:
                 try:
-                    item = log_queue_obj.get(timeout=1.0)
+                    item = queue.get()
                     if item is None:  # 終了シグナル
                         if buffer:
                             f.write(b"".join(buffer))
@@ -57,12 +53,7 @@ class TraceLogWriter:
                         f.write(b"".join(buffer))
                         buffer.clear()
                         buffer_bytes = 0
-                except queue.Empty:
-                    if buffer:
-                        f.write(b"".join(buffer))
-                        buffer.clear()
-                        buffer_bytes = 0
-                    continue
+
                 except KeyboardInterrupt:
                     break
                 except Exception:
@@ -93,12 +84,6 @@ class TraceLog:
         # FastAPI / HTTPX (標準logging) の統合
         self._integrate_standard_logging()
 
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.shutdown()
-
     _STR_TO_LEVEL = {
         "trace": TRACE_LEVEL_NUM,
         "debug": logging.DEBUG,
@@ -128,14 +113,9 @@ class TraceLog:
     def _queue_processor(self, logger: Any, method_name: str, event_dict: EventDict) -> Any:
         """structlog のイベントを JSON 化して Queue に入れる"""
         event_dict["service"] = self._service_name
-        # msgspec が処理できない exc_info (tuple) を削除（format_exc_info で文字列化済み）
-        if "exc_info" in event_dict:
-            event_dict.pop("exc_info")
         try:
-            # msgspec.to_builtins で非シリアライズ対象をクレンジング
-            # これにより、exc_info 等が含まれていても安全に JSON 化できます
-            clean_event = msgspec.to_builtins(event_dict)
-            self._queue.put_nowait(self._encoder.encode(clean_event))
+            # msgspecでバイト列にエンコード
+            self._queue.put_nowait(self._encoder.encode(event_dict))
         except queue.Full:
             # キューが満杯の場合はドロップ（パフォーマンス優先）
             pass
@@ -184,45 +164,42 @@ class TraceLog:
             return str(data)
 
 
-    def _log(self, level: str, data: Any, event_message: Optional[str] = None, **kwargs):
+    def _log(self, level: str, request_id: str, data: Any, event_message: Optional[str] = None, **kwargs):
         """structlogを呼び出す共通メソッド (整数レベルを使用して TypeError を回避)"""
-        request_id = request_id_ctx.get()
         level_lower = level.lower()
         # 文字列から整数レベルへ変換。未定義なら INFO(20)
         level_int = self._STR_TO_LEVEL.get(level_lower, logging.INFO)
         # event_message が指定されていない場合は request_id を event 名として使用
         self._logger.log(level_int, event_message or request_id, request_id=request_id, data=self._convert_data(data), **kwargs)
 
-    def debug(self, data: Any = None, event_message: Optional[str] = None):
-        self._log("debug", data, event_message=event_message)
+    def debug(self, request_id: str, data: Any = None, event_message: Optional[str] = None):
+        self._log("debug", request_id, data, event_message=event_message)
 
-    def error(self, data: Any = None, exc_info: Optional[Exception] = None, event_message: Optional[str] = None):
-        self._log("error", data, exc_info=exc_info, event_message=event_message)
+    def error(self, request_id: str, data: Any = None, exc_info: bool = False, event_message: Optional[str] = None):
+        self._log("error", request_id, data, exc_info=exc_info, event_message=event_message)
 
-    def trace(self, data: Any = None, event_message: Optional[str] = None):
+    def trace(self, request_id: str, data: Any = None, event_message: Optional[str] = None):
         """カスタムレベル TRACE でのログ出力"""
-        self._log("trace", data, event_message=event_message)
+        self._log("trace", request_id, data, event_message=event_message)
 
-    def info(self, data: Any = None, event_message: Optional[str] = None):
-        self._log("info", data, event_message=event_message)
+    def info(self, request_id: str, data: Any = None, event_message: Optional[str] = None):
+        self._log("info", request_id, data, event_message=event_message)
 
-    def warning(self, data: Any = None, event_message: Optional[str] = None):
-        self._log("warning", data, event_message=event_message)
+    def warning(self, request_id: str, data: Any = None, event_message: Optional[str] = None):
+        self._log("warning", request_id, data, event_message=event_message)
 
     def start(self, request_id: str, data: Any = None, event_message: Optional[str] = None, level: str="info"):
         """計測開始ログ"""
-        request_id_ctx.set(request_id)
         self._start_times[request_id] = time.perf_counter()
-        self._log(level, data, event_message=event_message or "start")
+        self._log(level, request_id, data, event_message=event_message or "start")
 
-    def end(self, data: Any = None, event_message: Optional[str] = None, level: str="info", **kwargs):
+    def end(self, request_id: str, data: Any = None, event_message: Optional[str] = None, level: str="info", **kwargs):
         """計測終了ログ。経過時間(elapsed_ms)を自動計算"""
-        request_id = request_id_ctx.get()
         start_time = self._start_times.pop(request_id, None)
         elapsed = None
         if start_time is not None:
             elapsed = (time.perf_counter() - start_time) * 1000.0
-        self._log(level, data, event_message=event_message or "end", elapsed_ms=elapsed)
+        self._log(level, request_id, data, event_message=event_message or "end", elapsed_ms=elapsed)
 
     def shutdown(self):
         """ロガーの終了処理。未出力のログをフラッシュする"""

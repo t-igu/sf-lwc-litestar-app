@@ -2,17 +2,35 @@ import socket
 import os
 import signal
 import sys
+import threading
+import queue
+from typing import Optional
 
 class TraceLogDaemon:
     """
     独立して動作するログ収集デーモン。
     Unixドメインソケット(DGRAM)で受信し、バッファリングして高速にファイルへ書き出す。
     """
-    def __init__(self, log_file: str, socket_path: str = "/tmp/tracelog.sock", buffer_limit: int = 128 * 1024):
+    def __init__(self, log_file: str, socket_path: Optional[str] = None, buffer_limit: int = 128 * 1024):
         self.log_file = log_file
+        if socket_path is None:
+            socket_path = "tracelog.sock" if os.name == "nt" else "/tmp/tracelog.sock"
+            
         self.socket_path = socket_path
         self.buffer_limit = buffer_limit
         self._running = True
+        self._write_queue = queue.Queue()
+
+    def _writer_thread(self):
+        """ディスク書き込み専用のスレッド"""
+        fd = os.open(self.log_file, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
+        with os.fdopen(fd, "ab", buffering=0) as f:
+            while self._running or not self._write_queue.empty():
+                try:
+                    chunk = self._write_queue.get(timeout=1.0)
+                    f.write(chunk)
+                except queue.Empty:
+                    continue
 
     def run(self):
         # 古いソケットのクリーンアップ
@@ -42,54 +60,44 @@ class TraceLogDaemon:
         signal.signal(signal.SIGINT, handle_exit)
         signal.signal(signal.SIGTERM, handle_exit)
 
-        # ファイルをバイナリ・追記モードで開く
-        fd = os.open(self.log_file, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
+        # 書き込みスレッド開始
+        writer = threading.Thread(target=self._writer_thread)
+        writer.start()
 
         try:
-            with os.fdopen(fd, "ab", buffering=0) as f:
-                buffer = []
-                buffer_bytes = 0
+            buffer = []
+            buffer_bytes = 0
 
-                while self._running:
-                    try:
-                        # 最大 64KB のパケットを受信
-                        data = sock.recv(65536)
-                        if not data:
-                            continue
+            while self._running:
+                try:
+                    data = sock.recv(65536)
+                    if not data: continue
 
-                        line = data + b"\n"
-                        buffer.append(line)
-                        buffer_bytes += len(line)
+                    line = data + b"\n"
+                    buffer.append(line)
+                    buffer_bytes += len(line)
 
-                        # バッファ閾値を超えたら一括書き込み
-                        if buffer_bytes >= self.buffer_limit:
-                            f.write(b"".join(buffer))
-                            buffer.clear()
-                            buffer_bytes = 0
+                    if buffer_bytes >= self.buffer_limit:
+                        self._write_queue.put(b"".join(buffer))
+                        buffer.clear()
+                        buffer_bytes = 0
 
-                    except socket.timeout:
-                        # 1秒間データが来なければ、溜まっているバッファを書き出す（定期フラッシュ）
-                        if buffer:
-                            f.write(b"".join(buffer))
-                            buffer.clear()
-                            buffer_bytes = 0
-                        continue
-                    except BlockingIOError:
-                        continue
-                    except Exception as e: # Catch all other exceptions during receive/write
-                        if self._running:
-                            print(f"Daemon Error during receive/write: {e}", file=sys.stderr)
-                        sys.stderr.flush()
-                # 終了時にバッファをフラッシュ
-                if buffer:
-                    f.write(b"".join(buffer))
+                except socket.timeout:
+                    if buffer:
+                        self._write_queue.put(b"".join(buffer))
+                        buffer.clear()
+                        buffer_bytes = 0
+                except Exception:
+                    continue
         finally:
+            self._running = False
+            writer.join()
             sock.close()
             if os.path.exists(self.socket_path):
                 os.remove(self.socket_path)
 
 if __name__ == "__main__":
-    # ログファイル名を指定。テスト用にバッファを小さく(1024)設定
+    # ログファイル名を指定。高負荷に耐えられるようバッファを調整
     log_target = "unified_trace.log"
-    daemon = TraceLogDaemon(log_target, buffer_limit=1024)
+    daemon = TraceLogDaemon(log_target, buffer_limit=128 * 1024)
     daemon.run()
