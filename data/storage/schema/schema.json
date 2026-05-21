@@ -1,0 +1,88 @@
+{
+  "models": {
+"DownloadMaster__c": {
+  "description": "Salesforce 帳票ダウンロードマスタ",
+  "fields": {
+    "id": {
+      "type": "str",
+      "required": false
+    },
+    "filename": {
+      "type": "str",
+      "required": true
+    },
+    "filename_disp": {
+      "type": "str",
+      "required": false
+    },
+    "encrypted_filepath": {
+      "type": "str",
+      "required": true
+    },
+    "extension": {
+      "type": "str",
+      "required": true
+    },
+    "status": {
+      "type": "str",
+      "required": true,
+      "default": "Pending"
+    }
+  }
+},
+"DownloadMasterWork__c": {
+  "description": "Salesforce 帳票ダウンロードマスタワーク",
+  "fields": {
+    "id": {
+      "type": "str",
+      "required": false
+    },
+    "filename": {
+      "type": "str",
+      "required": true
+    },
+    "filename_disp": {
+      "type": "str",
+      "required": false
+    },
+    "encrypted_filepath": {
+      "type": "str",
+      "required": true
+    },
+    "extension": {
+      "type": "str",
+      "required": true
+    },
+    "status": {
+      "type": "str",
+      "required": true,
+      "default": "Pending"
+    }
+  }
+},
+    "QueueModel": {
+      "description": "Storage サーバのアップロードキュー",
+      "fields": {
+        "request_id":       { "type": "str",  "required": true },
+        "id":               { "type": "str",  "required": true },
+        "filename":         { "type": "str",  "required": true },
+        "filename_disp":    { "type": "str",  "required": false },
+        "encrypted_filepath": { "type": "str", "required": true },
+        "extension":        { "type": "str",  "required": true },
+        "status":           { "type": "str",  "required": true, "default": "Pending" },
+        "retry_count":      { "type": "int",  "required": true, "default": 0 },
+        "last_error":       { "type": "str",  "required": false }
+      }
+    },
+
+    "SalesforceToken": {
+      "description": "Salesforce OAuth2 Token Response",
+      "fields": {
+        "access_token": { "type": "str", "required": true },
+        "instance_url": { "type": "str", "required": true },
+        "token_type":   { "type": "str", "required": true, "default": "Bearer" },
+        "scope":        { "type": "str", "required": false }
+      }
+    }
+  }
+}

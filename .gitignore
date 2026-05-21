@@ -9,7 +9,9 @@ wheels/
 # Virtual environments
 .venv
 
-data/
+data/storage/data/*
+*.pem
+DM*.json
 sandbox/
 tree*
 log_viewer/
